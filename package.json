@@ -1,0 +1,12 @@
+{
+  "name": "webrtc-node",
+  "version": "0.0.1",
+  "description": "jungrok",
+  "dependencies": {
+    "express": "^4.17.1",
+    "helmet": "^4.6.0",
+    "node-static": "^0.7.10",
+    "socket.io": "^4.4.0",
+    "username-generator": "^1.1.0"
+  }
+}
