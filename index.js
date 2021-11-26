@@ -9,6 +9,7 @@ const SOCKET_EVENT = {
   IP:"ipaddr",
   MSG : "message",
 };
+const port = 7000;
 const os = require('os');
 const index = require("./route/index");
 const path = require('path');
@@ -20,29 +21,33 @@ const { defaultMaxListeners } = require('events');
 
 const app = express();
 app.use(index);
-app.use(
-  helmet({contentSecurityPolicy:false,})
-  );
+  
 
+//const http = require("http").createServer(app);
+//let socketio = require("socket.io")(http,{cors:{origin:"*"},});
 
-const http = require("http").createServer(app);
-const io = require("socket.io")(http,{cors:{origin:"*"},});
+//http.listen(port ,() =>console.log("port "+port));
+//let io = socketio.listen(port);
+
+const server = require("http").Server(app);
+const io = require("socket.io")(server,{cors:{origin:"*"},});
 
 function Log(message, data){
-  console.log((new Date()).toISOString(),message, data);
+  console.log((new Date()).toISOString(),message ," : ", data);
 };
 
 const users = {};
-Log("start");
+Log("start", "server");
+server.listen(port , ()=>{Log("server listening on port", port);});
 
-const port = 7000;
 
-Log("server listening on port", port);
 
 let rooms = [];
-io.on("connection", (socket) => {
-  Log("connection! start");   
-
+io.sockets.on("connection", (socket) => {
+  Log("get socket "+socket.id,"connection! start");   
+  
+  socket.join("poo");
+  io.to('poo').emit("hoo");
     socket.on(SOCKET_EVENT.DISCONNECTED, (reason) => {    
       
       Log(SOCKET_EVENT.DISCONNECTED,reason);
@@ -50,23 +55,38 @@ io.on("connection", (socket) => {
 
 
     socket.on(SOCKET_EVENT.CREATEROOM,room  => {
-    Log("recive CREATEROOM" + room);
 
-    let clientsInRoom = io.sockets.adapter.rooms[room];    
+    Log(SOCKET_EVENT.CREATEROOM, room);
+  
+    let roomName = room;
+    let clientsInRoom = io.sockets.adapter.rooms[roomName]; 
+    
     let numClients = clientsInRoom? Object.keys(clientsInRoom.socket).length : 0;
-    Log("Room" + room +" now Cnt" + numClients);
+    Log(SOCKET_EVENT.CREATEROOM,"Room" + room +" now Cnt " + numClients);
 
-    if(numClients ===0){
-      socket.join(room);
-      Log("Client id"+ socket.id + 'created room' + room);
-      socket.emit(SOCKET_EVENT.CREATED,socket.id);
+    if(numClients ==0){
+      Log(1);
+      socket.join(roomName);
+      const id = socket.id;
+      Log(SOCKET_EVENT.CREATEROOM ,"Client id" + id + ' created room ' + room);
+
+      let numClients = clientsInRoom? Object.keys(clientsInRoom.socket).length : 0;
+      Log(SOCKET_EVENT.CREATEROOM,"Room" + room +" now Cnt " + numClients);
+
+      socket.emit(SOCKET_EVENT.CREATED, id );
     }
-    else if(numClients ===1){
-      Log("Client id"+ socket.id + 'joined room' + room);
-      io.sockets.in(room).emit(SOCKET_EVENT.JOIN,room,socket.id);
-      io.sockets.in(room).emit(SOCKET_EVENT.READY);
+    else if(numClients ==1){
+      Log(2);
+      Log(SOCKET_EVENT.CREATEROOM,'joined room ' + room);
+      socket.join(roomName);
+
+      socket.emit(SOCKET_EVENT.JOIN,roomName);
+      
+      io.sockets.in(roomName).emit(SOCKET_EVENT.READY,room);
+      socket.broadcast.emit(SOCKET_EVENT.READY,room)
     }
     else{
+      Log(3);
       socket.emit(SOCKET_EVENT.FULL,room);
     }
 
@@ -82,7 +102,7 @@ io.on("connection", (socket) => {
   
     socket.on(SOCKET_EVENT.MSG
       , (msg)=>{
-      Log("client :",msg );
+      Log("MSG","client :",msg );
       socket.broadcast.emit(SOCKET_EVENT.MSG,msg);
     });
 
@@ -90,5 +110,4 @@ io.on("connection", (socket) => {
   });
 
   
-
-  http.listen(port ,() =>console.log("port "+port));
+  
